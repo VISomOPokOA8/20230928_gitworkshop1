@@ -1,0 +1,60 @@
+name: Golang CI/CD
+
+on:
+  push:
+    branches:
+      - 'v[0-9]+.[0-9]+'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check Commit Message
+        id: commit_message
+        run: |
+          if [[ $(git log -1 --pretty=%B) =~ ^#NORUN ]]; then
+            echo "Commit message contains #NORUN. Skipping the workflow."
+            exit 78
+          fi
+        continue-on-error: true
+        
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.x
+      
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Build Golang Application
+        run: go build -o app main.go
+      
+      - name: Deploy to Railway
+        run: |
+          # Replace with your Railway deployment script or commands
+          # e.g., railway up --project <your-project-name>
+        env:
+          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
+          
+      - name: Create Release
+        run: |
+          release_name=$(echo "${GITHUB_REF/refs\/tags\//}")
+          # Create a release using release_name
+          # e.g., github-release release -o <owner> -r <repo> -t "$release_name" -n "$release_name"
+          
+      - name: Get Railway Deployment URL
+        id: railway_url
+        run: |
+          # Replace with commands to retrieve the Railway deployment URL
+          # e.g., railway show <your-project-name> --format url
+        env:
+          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
+        continue-on-error: true
+        
+      - name: Send Slack Notification
+        run: |
+          slack_message="Name: Your Name\nMatriculation Number: Your Matriculation Number\nEmail: Your Email\nRepository: ${{ github.repository }}\nDeployment URL: ${{ steps.railway_url.outputs.url }}"
+          curl -X POST -H 'Content-type: application/json' --data "{'text':'$slack_message','attachments':[{'text':'Open Application','fallback':'Open Application','actions':[{'type':'button','text':'Open Application','url':'${{ steps.railway_url.outputs.url }}'}]}]}" <your-slack-webhook-url>
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
